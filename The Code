@@ -1,0 +1,224 @@
+import os
+import hashlib
+
+print("ADVANCED PHONE PROTECTION v2.0")
+print("="*45)
+
+# Advanced malware detection
+malicious_extensions = [
+    '.apk', '.exe', '.dex', '.bat', '.vbs', '.scr',
+    '.jar', '.so', '.elf', '.bin', '.sh', '.cmd'
+]
+
+suspicious_keywords = [
+    'virus', 'trojan', 'malware', 'hack', 'crack',
+    'keylog', 'rat', 'backdoor', 'exploit', 'payload',
+    'inject', 'rootkit', 'worm', 'ransom', 'spyware',
+    'adware', 'botnet', 'phish'
+]
+
+# Known malicious file signatures (hash)
+known_malware = [
+    'd41d8cd98f00b204e9800998ecf8427e',
+    '098f6bcd4621d373cade4e832627b4f6',
+]
+
+def calculate_file_hash(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    except:
+        return None
+
+def check_file_permissions(file_path):
+    try:
+        import stat
+        permissions = os.stat(file_path).st_mode
+        if permissions & stat.S_IXUSR:
+            return True
+    except:
+        pass
+    return False
+
+def analyze_file_size(file_path):
+    try:
+        size = os.path.getsize(file_path)
+        if size == 0 or size > 100 * 1024 * 1024:
+            return True, size
+    except:
+        pass
+    return False, 0
+
+def advanced_scan(folder):
+    threat_levels = {
+        "HIGH": [],
+        "MEDIUM": [],
+        "LOW": []
+    }
+    
+    total = 0
+    hidden_files = 0
+    
+    print(f"\nDeep scan starting: {folder}\n")
+    
+    try:
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                total += 1
+                
+                if total % 50 == 0:
+                    print(f"Scanned {total} files...")
+                
+                full_path = os.path.join(root, file)
+                file_lower = file.lower()
+                threat_score = 0
+                threat_reasons = []
+                
+                # Extension check
+                if any(file_lower.endswith(ext) for ext in malicious_extensions):
+                    threat_score += 40
+                    threat_reasons.append("Malicious extension")
+                
+                # Name check
+                keyword_count = sum(1 for k in suspicious_keywords if k in file_lower)
+                if keyword_count > 0:
+                    threat_score += keyword_count * 15
+                    threat_reasons.append(f"{keyword_count} suspicious keywords")
+                
+                # Hidden file
+                if file.startswith('.'):
+                    hidden_files += 1
+                    threat_score += 10
+                    threat_reasons.append("Hidden file")
+                
+                # Hash check
+                file_hash = calculate_file_hash(full_path)
+                if file_hash in known_malware:
+                    threat_score += 100
+                    threat_reasons.append("KNOWN MALWARE")
+                
+                # Size analysis
+                abnormal, size = analyze_file_size(full_path)
+                if abnormal:
+                    threat_score += 20
+                    if size == 0:
+                        threat_reasons.append("Empty file (0 bytes)")
+                    else:
+                        threat_reasons.append(f"Very large ({size//1024//1024}MB)")
+                
+                # Double extension check
+                if file.count('.') > 1:
+                    threat_score += 25
+                    threat_reasons.append("Double extension")
+                
+                # Suspicious locations
+                suspicious_locations = ['temp', 'cache', 'tmp', 'hidden']
+                if any(loc in root.lower() for loc in suspicious_locations):
+                    threat_score += 15
+                    threat_reasons.append("Suspicious location")
+                
+                # Determine threat level
+                if threat_score >= 60:
+                    threat_levels["HIGH"].append({
+                        "file": full_path,
+                        "score": threat_score,
+                        "reasons": threat_reasons
+                    })
+                elif threat_score >= 30:
+                    threat_levels["MEDIUM"].append({
+                        "file": full_path,
+                        "score": threat_score,
+                        "reasons": threat_reasons
+                    })
+                elif threat_score >= 10:
+                    threat_levels["LOW"].append({
+                        "file": full_path,
+                        "score": threat_score,
+                        "reasons": threat_reasons
+                    })
+        
+        return threat_levels, total, hidden_files
+        
+    except Exception as e:
+        print(f"Scan error: {e}")
+        return None, 0, 0
+
+def show_report(results, total, hidden):
+    print("\n" + "="*45)
+    print("SCAN RESULTS")
+    print("="*45)
+    print(f"Total files: {total}")
+    print(f"Hidden files: {hidden}")
+    
+    total_threats = sum(len(results[s]) for s in results)
+    print(f"Detected threats: {total_threats}\n")
+    
+    # High risk files
+    if results["HIGH"]:
+        print("HIGH RISK (Check immediately!):")
+        print("-" * 45)
+        for i, threat in enumerate(results["HIGH"], 1):
+            print(f"\n{i}. Threat Score: {threat['score']}/100")
+            print(f"   File: {threat['file']}")
+            print(f"   Reasons: {', '.join(threat['reasons'])}")
+    
+    # Medium risk files
+    if results["MEDIUM"]:
+        print(f"\nMEDIUM RISK ({len(results['MEDIUM'])} files):")
+        print("-" * 45)
+        for i, threat in enumerate(results["MEDIUM"][:5], 1):
+            print(f"\n{i}. Score: {threat['score']}/100")
+            print(f"   File: {os.path.basename(threat['file'])}")
+            print(f"   Reasons: {', '.join(threat['reasons'])}")
+        
+        if len(results["MEDIUM"]) > 5:
+            print(f"\n   ... and {len(results['MEDIUM']) - 5} more")
+    
+    # Low risk files
+    if results["LOW"]:
+        print(f"\nLOW RISK ({len(results['LOW'])} files)")
+    
+    if total_threats == 0:
+        print("\nGREAT! No threats found.")
+        print("   Your phone looks clean!")
+    
+    print("\n" + "="*45)
+    print("\nRECOMMENDATIONS:")
+    
+    if results["HIGH"]:
+        print("  Delete high-risk files IMMEDIATELY!")
+    if results["MEDIUM"]:
+        print("  Review medium-risk files")
+    
+    print("  Do not install unknown APK files")
+    print("  Only grant necessary permissions to apps")
+    print("  Use updated antivirus software")
+    print("  Do not click suspicious links")
+
+# MAIN PROGRAM
+print("\nWhich folder do you want to scan?\n")
+print("1. Downloads")
+print("2. Entire phone (Takes long!)")
+print("3. WhatsApp")
+print("4. DCIM (Camera)")
+print("5. Enter path manually")
+
+choice = input("\nChoice: ")
+
+paths = {
+    "1": "/storage/emulated/0/Download",
+    "2": "/storage/emulated/0",
+    "3": "/storage/emulated/0/WhatsApp",
+    "4": "/storage/emulated/0/DCIM"
+}
+
+if choice == "5":
+    folder = input("Folder path: ")
+else:
+    folder = paths.get(choice, "/storage/emulated/0/Download")
+
+# Start scanning
+results, total, hidden = advanced_scan(folder)
+
+if results:
+    show_report(results, total, hidden)
